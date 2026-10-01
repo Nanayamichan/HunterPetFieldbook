@@ -1,0 +1,15 @@
+## Interface: 16001
+## IconTexture: Interface\Icons\Ability_Hunter_BeastTaming
+## Title: Nana's Hunter Pet Fieldbook.
+## Notes: A Hunter helper for WoW Forever.
+## Author: Nanayamichan
+## Version: 1.0
+## SavedVariables: MyAddonState
+
+Data.lua
+PetNPCData.lua
+ViewGeneral.lua
+ViewPetList.lua
+ViewDietList.lua
+ViewAbilitiesList.lua
+main.lua
