@@ -2,32 +2,46 @@
 local addonName, addonTable = ...
 
 -------------------------------------------------
--- 1. MAIN WINDOW SETUP
+-- 1. MAIN WINDOW SETUP & RESIZE LOGIC
 -------------------------------------------------
-local myWindow = CreateFrame("Frame", "MyAddonWindow", UIParent, "BasicFrameTemplate")
-myWindow:SetSize(570, 480) -- Increased to 570
+local myWindow = CreateFrame("Frame", "HunterPetWindow", UIParent, "BasicFrameTemplate")
 myWindow:Hide()
 myWindow:SetMovable(true)
 myWindow:EnableMouse(true)
 myWindow:RegisterForDrag("LeftButton")
 myWindow:SetScript("OnDragStart", myWindow.StartMoving)
+myWindow:SetResizable(true)
 
 myWindow.title = myWindow:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 myWindow.title:SetPoint("CENTER", myWindow.TitleBg, "CENTER", 0, 0)
-myWindow.title:SetText("Hunter Pet Guide")
+myWindow.title:SetText("Hunter Pet Fieldbook")
 
--- Add Resizing Capabilities
-myWindow:SetResizable(true)
-
--- Lock width at 570, allow height to expand up to 1200
-if myWindow.SetResizeBounds then
-    myWindow:SetResizeBounds(570, 480, 570, 1200) 
-else
-    myWindow:SetMinResize(570, 480)
-    myWindow:SetMaxResize(570, 1200)
+local function ApplyResizeSettings()
+    if not MyAddonState then return end
+    
+    if MyAddonState.allowHorizontalResize then
+        if myWindow.SetResizeBounds then
+            myWindow:SetResizeBounds(620, 480, 1200, 1200)
+        else
+            myWindow:SetMinResize(620, 480)
+            myWindow:SetMaxResize(1200, 1200)
+        end
+    else
+        if myWindow.SetResizeBounds then
+            myWindow:SetResizeBounds(620, 480, 620, 1200)
+        else
+            myWindow:SetMinResize(620, 480)
+            myWindow:SetMaxResize(620, 1200)
+        end
+        
+        if myWindow:GetWidth() > 620 then
+            myWindow:SetWidth(620)
+            MyAddonState.width = 620
+        end
+    end
 end
+addonTable.ApplyResizeSettings = ApplyResizeSettings
 
--- Create the draggable grip icon in the bottom right corner
 local resizeGrip = CreateFrame("Button", nil, myWindow)
 resizeGrip:SetSize(16, 16)
 resizeGrip:SetPoint("BOTTOMRIGHT", myWindow, "BOTTOMRIGHT", -6, 6)
@@ -35,20 +49,23 @@ resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
 
--- Start sizing when clicked
 resizeGrip:SetScript("OnMouseDown", function(self, button)
     if button == "LeftButton" then
-        -- "BOTTOM" tells the API to only drag the bottom edge vertically
-        myWindow:StartSizing("BOTTOM")
+        if MyAddonState and MyAddonState.allowHorizontalResize then
+            myWindow:StartSizing("BOTTOMRIGHT")
+        else
+            myWindow:StartSizing("BOTTOM")
+        end
     end
 end)
 
--- Stop sizing and save the new dimensions when the mouse is released
 resizeGrip:SetScript("OnMouseUp", function(self, button)
     myWindow:StopMovingOrSizing()
     if MyAddonState then
-        MyAddonState.width = myWindow:GetWidth()
         MyAddonState.height = myWindow:GetHeight()
+        if MyAddonState.allowHorizontalResize then
+            MyAddonState.width = myWindow:GetWidth()
+        end
     end
 end)
 
@@ -71,11 +88,16 @@ local viewAbilitiesList = addonTable.ViewAbilitiesList
 viewAbilitiesList:SetParent(myWindow)
 viewAbilitiesList:SetAllPoints(myWindow)
 
+local viewSettings = addonTable.ViewSettings
+viewSettings:SetParent(myWindow)
+viewSettings:SetAllPoints(myWindow)
+
 local function LoadView(viewName)
     viewGeneral:Hide()
     viewPetList:Hide()
     viewDietList:Hide()
     viewAbilitiesList:Hide()
+    viewSettings:Hide()
     
     if viewName == "General" then
         viewGeneral:Show()
@@ -93,10 +115,13 @@ local function LoadView(viewName)
         viewAbilitiesList:Show()
         MyAddonState.lastView = "AbilitiesList"
         myWindow.title:SetText("Hunter Pet Fieldbook - Abilities")
+    elseif viewName == "Settings" then
+        viewSettings:Show()
+        MyAddonState.lastView = "Settings"
+        myWindow.title:SetText("Hunter Pet Fieldbook - Settings")
     end
 end
 
--- Explicitly expose the LoadView function to your other scripts
 addonTable.LoadView = LoadView
 
 -------------------------------------------------
@@ -107,29 +132,38 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 
 eventFrame:SetScript("OnEvent", function(self, event, loadedAddonName)
     if loadedAddonName == addonName then
-        MyAddonState = MyAddonState or {
-            lastView = "General",
-            posX = 0,
-            posY = 0,
-            width = 520,
-            height = 480,
-            minimapAngle = math.rad(225) -- Store default minimap angle
-        }
+        MyAddonState = MyAddonState or {}
+        
+        MyAddonState.startupView = MyAddonState.startupView or "General"
+        if MyAddonState.showMinimap == nil then MyAddonState.showMinimap = true end
+        
+        if MyAddonState.colorPetLevels == nil then MyAddonState.colorPetLevels = true end 
+
+        MyAddonState.posX = MyAddonState.posX or 0
+        MyAddonState.posY = MyAddonState.posY or 0
+        MyAddonState.width = MyAddonState.width or 620
+        MyAddonState.height = MyAddonState.height or 480
+        MyAddonState.minimapAngle = MyAddonState.minimapAngle or math.rad(225)
+        MyAddonState.allowHorizontalResize = MyAddonState.allowHorizontalResize or false
         
         myWindow:ClearAllPoints()
         myWindow:SetPoint("CENTER", UIParent, "CENTER", MyAddonState.posX, MyAddonState.posY)
         
--- Apply saved dimensions (Force width to 570, keep custom height)
-        if MyAddonState.height then
-            myWindow:SetSize(570, MyAddonState.height)
+        if not MyAddonState.allowHorizontalResize then
+            MyAddonState.width = 620
         end
+        myWindow:SetSize(MyAddonState.width, MyAddonState.height)
         
-        -- Apply saved minimap button position
+        addonTable.ApplyResizeSettings()
+        
         if addonTable.UpdateMinimapPosition then
             addonTable.UpdateMinimapPosition(MyAddonState.minimapAngle)
         end
+        if addonTable.UpdateMinimapVisibility then
+            addonTable.UpdateMinimapVisibility()
+        end
         
-        LoadView(MyAddonState.lastView)
+        LoadView(MyAddonState.startupView)
     end
 end)
 
@@ -144,22 +178,28 @@ end)
 -- 4. BASIC VIEW NAVIGATION BUTTONS
 -------------------------------------------------
 local btnToPets = CreateFrame("Button", nil, viewGeneral, "UIPanelButtonTemplate")
-btnToPets:SetSize(120, 25)
-btnToPets:SetPoint("BOTTOM", viewGeneral, "BOTTOM", -130, 15)
+btnToPets:SetSize(110, 25)
+btnToPets:SetPoint("BOTTOM", viewGeneral, "BOTTOM", -165, 15)
 btnToPets:SetText("Lookup Pets")
 btnToPets:SetScript("OnClick", function() LoadView("PetList") end)
 
 local btnToDiets = CreateFrame("Button", nil, viewGeneral, "UIPanelButtonTemplate")
-btnToDiets:SetSize(120, 25)
-btnToDiets:SetPoint("BOTTOM", viewGeneral, "BOTTOM", 0, 15)
+btnToDiets:SetSize(110, 25)
+btnToDiets:SetPoint("BOTTOM", viewGeneral, "BOTTOM", -55, 15)
 btnToDiets:SetText("Pet Diets")
 btnToDiets:SetScript("OnClick", function() LoadView("DietList") end)
 
 local btnToAbilities = CreateFrame("Button", nil, viewGeneral, "UIPanelButtonTemplate")
-btnToAbilities:SetSize(120, 25)
-btnToAbilities:SetPoint("BOTTOM", viewGeneral, "BOTTOM", 130, 15)
+btnToAbilities:SetSize(110, 25)
+btnToAbilities:SetPoint("BOTTOM", viewGeneral, "BOTTOM", 55, 15)
 btnToAbilities:SetText("Pet Abilities")
 btnToAbilities:SetScript("OnClick", function() LoadView("AbilitiesList") end)
+
+local btnToSettings = CreateFrame("Button", nil, viewGeneral, "UIPanelButtonTemplate")
+btnToSettings:SetSize(110, 25)
+btnToSettings:SetPoint("BOTTOM", viewGeneral, "BOTTOM", 165, 15)
+btnToSettings:SetText("Settings")
+btnToSettings:SetScript("OnClick", function() LoadView("Settings") end)
 
 local btnToGenFromPets = CreateFrame("Button", nil, viewPetList, "UIPanelButtonTemplate")
 btnToGenFromPets:SetSize(120, 25)
@@ -178,6 +218,12 @@ btnToGenFromAbilities:SetSize(120, 25)
 btnToGenFromAbilities:SetPoint("BOTTOM", viewAbilitiesList, "BOTTOM", 0, 15)
 btnToGenFromAbilities:SetText("Back to General")
 btnToGenFromAbilities:SetScript("OnClick", function() LoadView("General") end)
+
+local btnToGenFromSettings = CreateFrame("Button", nil, viewSettings, "UIPanelButtonTemplate")
+btnToGenFromSettings:SetSize(120, 25)
+btnToGenFromSettings:SetPoint("BOTTOM", viewSettings, "BOTTOM", 0, 15)
+btnToGenFromSettings:SetText("Back to General")
+btnToGenFromSettings:SetScript("OnClick", function() LoadView("General") end)
 
 -------------------------------------------------
 -- 5. MINIMAP BUTTON SETUP
@@ -209,7 +255,6 @@ local function UpdateButtonPosition()
     miniBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
 end
 
--- Expose function so Section 3 can set the angle when the game loads
 addonTable.UpdateMinimapPosition = function(angle)
     if angle then
         currentAngle = angle
@@ -217,6 +262,14 @@ addonTable.UpdateMinimapPosition = function(angle)
     end
 end
 addonTable.UpdateMinimapPosition(currentAngle)
+
+addonTable.UpdateMinimapVisibility = function()
+    if MyAddonState and MyAddonState.showMinimap == false then
+        miniBtn:Hide()
+    else
+        miniBtn:Show()
+    end
+end
 
 miniBtn:SetScript("OnDragStart", function(self)
     self:SetScript("OnUpdate", function()
@@ -231,7 +284,6 @@ end)
 
 miniBtn:SetScript("OnDragStop", function(self)
     self:SetScript("OnUpdate", nil)
-    -- Save the new position to Saved Variables when you release the mouse
     if MyAddonState then
         MyAddonState.minimapAngle = currentAngle
     end
@@ -255,5 +307,16 @@ miniBtn:SetScript("OnLeave", function()
     GameTooltip:Hide()
 end)
 
---icon:SetTexture("Interface\\Icons\\Ability_Hunter_BeastTaming") -- Hunter BM icon
---icon:SetTexture("Interface\\Icons\\Ability_Hunter_Pet_Bear") -- Bear icon
+-------------------------------------------------
+-- 6. SLASH COMMANDS
+-------------------------------------------------
+SLASH_HUNTERPETFIELDBOOK1 = "/hpf"
+SLASH_HUNTERPETFIELDBOOK2 = "/nana"
+
+SlashCmdList["HUNTERPETFIELDBOOK"] = function()
+    if myWindow:IsShown() then
+        myWindow:Hide()
+    else
+        myWindow:Show()
+    end
+end

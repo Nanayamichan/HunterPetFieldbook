@@ -3,7 +3,7 @@
 ## Title: Nana's Hunter Pet Fieldbook.
 ## Notes: A Hunter helper for WoW Forever.
 ## Author: Nanayamichan
-## Version: 1.0
+## Version: 1.1.1
 ## SavedVariables: MyAddonState
 
 Data.lua
@@ -12,4 +12,5 @@ ViewGeneral.lua
 ViewPetList.lua
 ViewDietList.lua
 ViewAbilitiesList.lua
+ViewSettings.lua
 main.lua

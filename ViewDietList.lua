@@ -3,25 +3,25 @@ local addonName, addonTable = ...
 local viewDietList = CreateFrame("Frame")
 viewDietList:Hide()
 
--- Forward declaration of our sorting function
 local UpdateGrid 
 
--- 1. Configuration (Added "sortKey" to map buttons to food data)
+-- 1. Configuration (Columns expanded to fill a 560px inner grid)
 local cols = {
-    { title = "Pet Family", width = 100, sortKey = "name" },
-    { title = "Bread", width = 55, sortKey = "Bread" },
-    { title = "Cheese", width = 55, sortKey = "Cheese" },
-    { title = "Fish", width = 55, sortKey = "Fish" },
-    { title = "Fruit", width = 55, sortKey = "Fruit" },
-    { title = "Fungus", width = 55, sortKey = "Fungus" },
-    { title = "Meat", width = 55, sortKey = "Meat" },
+    { title = "Pet Family", width = 130, sortKey = "name" },
+    { title = "Bread", width = 70, sortKey = "Bread" },
+    { title = "Cheese", width = 70, sortKey = "Cheese" },
+    { title = "Fish", width = 70, sortKey = "Fish" },
+    { title = "Fruit", width = 70, sortKey = "Fruit" },
+    { title = "Fungus", width = 70, sortKey = "Fungus" },
+    { title = "Meat", width = 70, sortKey = "Meat" },
 }
 
--- 2. Interactive Column Headers
-local currentX = 25
+-- 2. Interactive Column Headers (Math synchronized for perfect alignment)
+local currentX = 0
 for _, col in ipairs(cols) do
     local btn = CreateFrame("Button", nil, viewDietList)
-    btn:SetPoint("TOPLEFT", viewDietList, "TOPLEFT", currentX, -35)
+    -- 25 represents the 15px ScrollFrame offset + 10px Row offset
+    btn:SetPoint("TOPLEFT", viewDietList, "TOPLEFT", 25 + currentX, -35)
     btn:SetSize(col.width, 20)
     btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     
@@ -30,12 +30,11 @@ for _, col in ipairs(cols) do
     label:SetJustifyH(col.title == "Pet Family" and "LEFT" or "CENTER")
     label:SetText(col.title)
     
-    -- When clicked, sort the grid by this column's sortKey
     btn:SetScript("OnClick", function()
         UpdateGrid(col.sortKey)
     end)
     
-    col.xOffset = currentX - 10 
+    col.xOffset = currentX 
     currentX = currentX + col.width
 end
 
@@ -45,10 +44,9 @@ scrollFrame:SetPoint("TOPLEFT", 15, -60)
 scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
 
 local content = CreateFrame("Frame")
-content:SetSize(470, 480)
+content:SetSize(560, 480) -- Stretched to match the new 620px window
 scrollFrame:SetScrollChild(content)
 
--- Helper function to check if the pet eats a specific food
 local function EatenByPet(dietArray, foodType)
     if not dietArray then return false end
     for _, food in ipairs(dietArray) do
@@ -59,13 +57,13 @@ end
 
 local checkmark = "|cFF00FF00X|r" 
 
--- 4. Row Pooling (Create 18 empty rows with cell arrays)
+-- 4. Row Pooling
 local rows = {}
 local rowHeight = 24
 
 for i = 1, 18 do
     local row = CreateFrame("Frame", nil, content)
-    row:SetSize(470, rowHeight)
+    row:SetSize(560, rowHeight) -- Stretched to match the new 620px window
     row:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -((i - 1) * rowHeight))
     
     local divider = row:CreateTexture(nil, "BACKGROUND")
@@ -76,9 +74,9 @@ for i = 1, 18 do
     
     row.cells = {}
     
-    -- Generate empty FontStrings based on our column config
     for colIdx, col in ipairs(cols) do
         local cell = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        -- xOffset now perfectly mirrors the header offset
         cell:SetPoint("LEFT", row, "LEFT", col.xOffset, 0)
         cell:SetWidth(col.width)
         cell:SetJustifyH(col.title == "Pet Family" and "LEFT" or "CENTER")
@@ -97,22 +95,19 @@ UpdateGrid = function(sortBy)
     
     table.sort(sortedPets, function(a, b)
         if sortBy == "name" then
-            return a < b -- Alphabetical sort
+            return a < b
         else
             local petA_eats = EatenByPet(HunterPetDB[a].diet, sortBy)
             local petB_eats = EatenByPet(HunterPetDB[b].diet, sortBy)
             
-            -- If both have the same value (both true or both false), default to alphabetical
             if petA_eats == petB_eats then
                 return a < b 
             end
             
-            -- Rank pets that CAN eat the food (true) above those that CANNOT (false)
             return petA_eats and not petB_eats
         end
     end)
     
-    -- Loop through the pre-made rows and populate the sorted data
     for i, petName in ipairs(sortedPets) do
         local petData = HunterPetDB[petName]
         local row = rows[i]
@@ -127,7 +122,6 @@ UpdateGrid = function(sortBy)
     end
 end
 
--- Initialize the grid by sorting alphabetically
 UpdateGrid("name")
 
 addonTable.ViewDietList = viewDietList

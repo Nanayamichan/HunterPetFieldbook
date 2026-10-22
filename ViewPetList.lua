@@ -8,6 +8,7 @@ viewPetList:Hide()
 local selectedFamily = nil
 local selectedAbility = nil 
 local selectedSpeed = nil
+local selectedRarity = nil -- New state for the Rarity dropdown
 local searchQuery = ""
 local filterByLevel = false
 
@@ -16,23 +17,29 @@ local titleText = viewPetList:CreateFontString(nil, "OVERLAY", "GameFontHighligh
 titleText:SetPoint("TOPLEFT", 20, -15)
 titleText:SetText("Pet Lookup")
 
+-- Five perfectly spaced controls across 620px
 local familyDropdown = CreateFrame("Frame", "NanaPetFamilyDropdown", viewPetList, "UIDropDownMenuTemplate")
-familyDropdown:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 0, -45)
-UIDropDownMenu_SetWidth(familyDropdown, 110)
+familyDropdown:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", -5, -45)
+UIDropDownMenu_SetWidth(familyDropdown, 100)
 
 local abilityDropdown = CreateFrame("Frame", "NanaPetAbilityDropdown", viewPetList, "UIDropDownMenuTemplate")
-abilityDropdown:SetPoint("TOPLEFT", familyDropdown, "TOPRIGHT", -15, 0)
-UIDropDownMenu_SetWidth(abilityDropdown, 120)
+abilityDropdown:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 115, -45)
+UIDropDownMenu_SetWidth(abilityDropdown, 105)
 
 local speedDropdown = CreateFrame("Frame", "NanaPetSpeedDropdown", viewPetList, "UIDropDownMenuTemplate")
-speedDropdown:SetPoint("TOPLEFT", abilityDropdown, "TOPRIGHT", -15, 0)
-UIDropDownMenu_SetWidth(speedDropdown, 90)
+speedDropdown:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 240, -45)
+UIDropDownMenu_SetWidth(speedDropdown, 85)
+
+-- The New Rarity Dropdown
+local rarityDropdown = CreateFrame("Frame", "NanaPetRarityDropdown", viewPetList, "UIDropDownMenuTemplate")
+rarityDropdown:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 345, -45)
+UIDropDownMenu_SetWidth(rarityDropdown, 85)
 
 local UpdateNPCList
 
 local searchBox = CreateFrame("EditBox", "NanaPetSearchBox", viewPetList, "InputBoxTemplate")
-searchBox:SetSize(110, 20)
-searchBox:SetPoint("TOPLEFT", speedDropdown, "TOPRIGHT", 0, -3)
+searchBox:SetSize(100, 20)
+searchBox:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 475, -48)
 searchBox:SetAutoFocus(false) 
 searchBox:SetMaxLetters(50)
 
@@ -44,15 +51,16 @@ searchBox:SetScript("OnTextChanged", function(self)
     local text = self:GetText()
     if text == "" then searchLabel:Show() else searchLabel:Hide() end
     searchQuery = string.lower(text)
-    UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed)
+    if UpdateNPCList then UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, selectedRarity) end
 end)
 
 searchBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 searchBox:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
+-- Checkbox perfectly aligned above the search box
 local levelCheckbox = CreateFrame("CheckButton", "NanaPetLevelCheck", viewPetList, "UICheckButtonTemplate")
 levelCheckbox:SetSize(26, 26)
-levelCheckbox:SetPoint("BOTTOMLEFT", searchBox, "TOPLEFT", -45, -2)
+levelCheckbox:SetPoint("TOPLEFT", viewPetList, "TOPLEFT", 425, -25)
 
 local levelCheckLabel = levelCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 levelCheckLabel:SetPoint("LEFT", levelCheckbox, "RIGHT", 0, 1)
@@ -60,15 +68,16 @@ levelCheckLabel:SetText("Hide pets above my level")
 
 levelCheckbox:SetScript("OnClick", function(self)
     filterByLevel = self:GetChecked()
-    UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed)
+    if UpdateNPCList then UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, selectedRarity) end
 end)
 
+-- Dropdown Initializers
 UIDropDownMenu_Initialize(familyDropdown, function(self, level, menuList)
     local info = UIDropDownMenu_CreateInfo()
     info.text = "All Pets"
     info.value = nil
     info.func = function(self)
-        UpdateNPCList(nil, nil, nil)
+        UpdateNPCList(nil, nil, nil, nil)
         UIDropDownMenu_SetSelectedValue(familyDropdown, nil)
     end
     info.checked = (selectedFamily == nil)
@@ -83,7 +92,7 @@ UIDropDownMenu_Initialize(familyDropdown, function(self, level, menuList)
         info.text = fam
         info.value = fam
         info.func = function(self)
-            UpdateNPCList(self.value, nil, nil)
+            UpdateNPCList(self.value, nil, nil, nil)
             UIDropDownMenu_SetSelectedValue(familyDropdown, self.value)
         end
         info.checked = (selectedFamily == fam)
@@ -95,7 +104,7 @@ UIDropDownMenu_Initialize(abilityDropdown, function(self, level, menuList)
     local info = UIDropDownMenu_CreateInfo()
     info.text = "All Abilities"
     info.value = nil
-    info.func = function(self) UpdateNPCList(selectedFamily, nil, selectedSpeed) end
+    info.func = function(self) UpdateNPCList(selectedFamily, nil, selectedSpeed, selectedRarity) end
     info.checked = (selectedAbility == nil)
     UIDropDownMenu_AddButton(info)
 
@@ -123,7 +132,7 @@ UIDropDownMenu_Initialize(abilityDropdown, function(self, level, menuList)
     for _, ab in ipairs(abilities) do
         info.text = ab
         info.value = ab
-        info.func = function(self) UpdateNPCList(selectedFamily, self.value, selectedSpeed) end
+        info.func = function(self) UpdateNPCList(selectedFamily, self.value, selectedSpeed, selectedRarity) end
         info.checked = (selectedAbility == ab)
         UIDropDownMenu_AddButton(info)
     end
@@ -133,7 +142,7 @@ UIDropDownMenu_Initialize(speedDropdown, function(self, level, menuList)
     local info = UIDropDownMenu_CreateInfo()
     info.text = "All Speeds"
     info.value = nil
-    info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, nil) end
+    info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, nil, selectedRarity) end
     info.checked = (selectedSpeed == nil)
     UIDropDownMenu_AddButton(info)
 
@@ -155,10 +164,32 @@ UIDropDownMenu_Initialize(speedDropdown, function(self, level, menuList)
     for _, spd in ipairs(speeds) do
         info.text = spd .. " Speed"
         info.value = spd
-        info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, self.value) end
+        info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, self.value, selectedRarity) end
         info.checked = (selectedSpeed == spd)
         UIDropDownMenu_AddButton(info)
     end
+end)
+
+UIDropDownMenu_Initialize(rarityDropdown, function(self, level, menuList)
+    local info = UIDropDownMenu_CreateInfo()
+    
+    info.text = "All Rarities"
+    info.value = nil
+    info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, nil) end
+    info.checked = (selectedRarity == nil)
+    UIDropDownMenu_AddButton(info)
+
+    info.text = "Common Only"
+    info.value = "Common"
+    info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, self.value) end
+    info.checked = (selectedRarity == "Common")
+    UIDropDownMenu_AddButton(info)
+
+    info.text = "Rare Only"
+    info.value = "Rare"
+    info.func = function(self) UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, self.value) end
+    info.checked = (selectedRarity == "Rare")
+    UIDropDownMenu_AddButton(info)
 end)
 
 -- 2. Scroll Area Setup
@@ -167,8 +198,13 @@ scrollFrame:SetPoint("TOPLEFT", 15, -85)
 scrollFrame:SetPoint("BOTTOMRIGHT", -35, 50)
 
 local content = CreateFrame("Frame")
-content:SetSize(520, 500)
+content:SetHeight(500) -- Only set height; we let the width stretch natively
 scrollFrame:SetScrollChild(content)
+
+-- THE SECRET SAUCE: Force the inner container to stretch with the outer scroll frame
+scrollFrame:SetScript("OnSizeChanged", function(self, width, height)
+    content:SetWidth(width)
+end)
 
 local npcRows = {}
 local rowHeight = 32
@@ -182,8 +218,11 @@ end
 
 for i = 1, 500 do
     local row = CreateFrame("Button", nil, content)
-    row:SetSize(520, rowHeight)
+    row:SetHeight(rowHeight)
+    
+    -- ELASTIC ANCHORING: Pin the left side, then pin the right side
     row:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -((i - 1) * rowHeight))
+    row:SetPoint("TOPRIGHT", content, "TOPRIGHT", -10, -((i - 1) * rowHeight))
     
     local highlight = row:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetColorTexture(1, 1, 1, 0.05)
@@ -191,6 +230,7 @@ for i = 1, 500 do
     
     local divider = row:CreateTexture(nil, "BACKGROUND")
     divider:SetColorTexture(1, 1, 1, 0.15)
+    -- Divider logic is elastic!
     PixelUtil.SetPoint(divider, "BOTTOMLEFT", row, "BOTTOMLEFT", 0, 0)
     PixelUtil.SetPoint(divider, "BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
     PixelUtil.SetHeight(divider, 1)
@@ -202,9 +242,12 @@ for i = 1, 500 do
     row.info:SetPoint("LEFT", 0, -8)
     
     row.skills = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    row.skills:SetPoint("RIGHT", -10, 0)
+    -- Pin the abilities to the right edge of the stretching row
+    row.skills:SetPoint("RIGHT", row, "RIGHT", -10, 0)
+    row.skills:SetWidth(180) 
+    row.skills:SetJustifyH("RIGHT") 
+    row.skills:SetWordWrap(false)
     
-    -- Shift-Click to Chat
     row:SetScript("OnClick", function(self)
         if IsShiftKeyDown() and self.chatString then
             local activeChat = ChatEdit_GetActiveWindow()
@@ -214,21 +257,17 @@ for i = 1, 500 do
         end
     end)
     
--- Rich Hover Tooltips
     row:SetScript("OnEnter", function(self)
         if self.beast then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
             GameTooltip:ClearLines()
             
-            -- Main Title
-            GameTooltip:AddLine(self.beast.name, 1, 0.82, 0) -- Classic gold text
+            GameTooltip:AddLine(self.beast.name, 1, 0.82, 0) 
             GameTooltip:AddLine(self.beast.familyName .. " Family", 1, 1, 1)
             
-            -- Pull data from General Tab's HunterPetDB
             if HunterPetDB and HunterPetDB[self.beast.familyName] then
                 local famData = HunterPetDB[self.beast.familyName]
                 
-                -- Check for diet data and format it safely
                 local dietData = famData.diet or famData.diets
                 if dietData then
                     local dietText = type(dietData) == "table" and table.concat(dietData, ", ") or dietData
@@ -248,7 +287,6 @@ for i = 1, 500 do
         end
     end)
 
-
     row:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
     end)
@@ -258,14 +296,16 @@ for i = 1, 500 do
 end
 
 -- 3. Populate Function
-UpdateNPCList = function(family, requiredAbility, requiredSpeed)
+UpdateNPCList = function(family, requiredAbility, requiredSpeed, requiredRarity)
     selectedFamily = family 
     selectedAbility = requiredAbility
     selectedSpeed = requiredSpeed
+    selectedRarity = requiredRarity
     
     UIDropDownMenu_SetText(familyDropdown, selectedFamily or "All Pets")
     UIDropDownMenu_SetText(abilityDropdown, selectedAbility or "All Abilities")
     UIDropDownMenu_SetText(speedDropdown, selectedSpeed and (selectedSpeed .. " Speed") or "All Speeds")
+    UIDropDownMenu_SetText(rarityDropdown, selectedRarity or "All Rarities")
     
     for _, row in ipairs(npcRows) do row:Hide() end
     
@@ -296,6 +336,7 @@ UpdateNPCList = function(family, requiredAbility, requiredSpeed)
         local hasAbility = true
         local hasSpeed = true
         local matchesSearch = true
+        local matchesRarity = true
         local isTameable = true
         
         if requiredAbility then
@@ -314,6 +355,12 @@ UpdateNPCList = function(family, requiredAbility, requiredSpeed)
             hasSpeed = false
         end
         
+        if requiredRarity == "Rare" and not beast.rare then
+            matchesRarity = false
+        elseif requiredRarity == "Common" and beast.rare then
+            matchesRarity = false
+        end
+        
         if searchQuery ~= "" then
             local lowerName = string.lower(beast.name)
             local lowerZone = string.lower(beast.zone)
@@ -329,10 +376,9 @@ UpdateNPCList = function(family, requiredAbility, requiredSpeed)
             end
         end
         
-        if hasAbility and hasSpeed and matchesSearch and isTameable and npcRows[rowIndex] then
+        if hasAbility and hasSpeed and matchesSearch and matchesRarity and isTameable and npcRows[rowIndex] then
             local row = npcRows[rowIndex]
             
-            -- Bind the beast data to the row so the Tooltip script can read it
             row.beast = beast
             
             local nameText = beast.name
@@ -340,10 +386,30 @@ UpdateNPCList = function(family, requiredAbility, requiredSpeed)
             if beast.isNew then nameText = nameText .. " |cFF00FF00[New]|r" end
             row.name:SetText(nameText)
             
-            local familyPrefix = (selectedFamily == nil) and (beast.familyName .. " - ") or ""
+local familyPrefix = (selectedFamily == nil) and (beast.familyName .. " - ") or ""
             local speedText = beast.speed and (" - " .. beast.speed .. " Speed") or ""
             
-            row.info:SetText("|cFFCCCCCC" .. familyPrefix .. beast.zone .. " (Lvl " .. beast.level .. ")" .. speedText .. "|r")
+            -- Dynamic Level Coloring Logic
+            local levelColor = "|cFFCCCCCC" -- Default Gray/Silver if disabled
+            if MyAddonState and MyAddonState.colorPetLevels then
+                -- Grab both the lowest and highest numbers in the string
+                local minLvl = tonumber(string.match(beast.level, "^%d+")) or 0
+                local maxLvl = tonumber(string.match(beast.level, "%d+$")) or minLvl
+                
+                if minLvl > playerLevel then
+                    levelColor = "|cFFFF0000" -- Red (Completely untameable)
+                elseif maxLvl > playerLevel then
+                    levelColor = "|cFFFF8000" -- Orange (Partially tameable, e.g. 21-22 when you are 21)
+                elseif maxLvl == playerLevel then
+                    levelColor = "|cFFFFFF00" -- Yellow (Equal)
+                elseif maxLvl <= playerLevel - 10 then
+                    levelColor = "|cFFFFFFFF" -- White (Trivial/Low Level)
+                else
+                    levelColor = "|cFF40FF40" -- Green (Tameable/Lower)
+                end
+            end
+            
+            row.info:SetText("|cFFCCCCCC" .. familyPrefix .. beast.zone .. " |r" .. levelColor .. "(Lvl " .. beast.level .. ")|r|cFFCCCCCC" .. speedText .. "|r")
             
             if beast.abilities and #beast.abilities > 0 then
                 row.skills:SetText(table.concat(beast.abilities, ", "))
@@ -360,6 +426,6 @@ UpdateNPCList = function(family, requiredAbility, requiredSpeed)
     end
 end
 
-UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed)
+UpdateNPCList(selectedFamily, selectedAbility, selectedSpeed, selectedRarity)
 addonTable.ViewPetList = viewPetList
 addonTable.UpdateNPCList = UpdateNPCList
